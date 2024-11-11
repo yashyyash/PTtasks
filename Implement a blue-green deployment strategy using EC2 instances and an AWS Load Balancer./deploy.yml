@@ -1,0 +1,54 @@
+name: Blue-Green Deployment
+ 
+
+on:
+  push:
+    branches:
+      - temp-branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      ALB_DNS_NAME: "blue-green-alb-1627412870.us-east-1.elb.amazonaws.com"
+      BLUE_TARGET_GROUP_ARN: "arn:aws:elasticloadbalancing:us-east-1:585768142802:targetgroup/blue-target-group/0e0428acb52b6e23"
+      GREEN_TARGET_GROUP_ARN: "arn:aws:elasticloadbalancing:us-east-1:585768142802:targetgroup/green-target-group/e2da13892977b06b"
+      LISTENER_ARN: "arn:aws:elasticloadbalancing:us-east-1:585768142802:listener/app/blue-green-alb/0971b10a52a33697/862323c8b88cade0"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up AWS CLI
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Deploy to Green Environment
+        run: |
+          echo "Deploying to Green Environment"
+          # Deploy to Green environment
+
+      - name: Health Check on Green Environment
+        run: |
+          echo "Waiting for Green Environment health checks"
+          # Add AWS CLI or curl to check health status
+
+      - name: Describe Listener to check its current configuration
+        run: |
+          aws elbv2 describe-listeners --listener-arn ${{ env.LISTENER_ARN }}
+
+      - name: Switch ALB Traffic to Green Environment
+        run: |
+          echo "Switching traffic to Green Environment"
+          aws elbv2 modify-listener \
+            --listener-arn ${{ env.LISTENER_ARN }} \
+            --default-actions Type=forward,TargetGroupArn=${{ env.GREEN_TARGET_GROUP_ARN }} || { echo 'Error modifying listener'; exit 1; }
+
+      - name: Test Green Environment
+        run: |
+          echo "Testing Green Environment"
+          curl ${{ env.ALB_DNS_NAME }}
