@@ -15,35 +15,22 @@ for /f "tokens=2 delims==" %%A in ('wmic os get osarchitecture /value 2^>nul') d
 
 :: Trim whitespace
 set ARCH=%ARCH: =%
-if "%ARCH%" == "64-bit" (
+if "%ARCH%"=="64-bit" (
     set ARCH=amd64
 ) else (
     echo Unsupported architecture: %ARCH%
     exit /b 1
 )
 
-:: Determine operating system
-for /f "tokens=*" %%A in ('ver') do (
-    set "OS=%%A"
-)
-echo Detected OS: %OS%
-
 :: Prepare variables
 set BASE_URL=https://github.com/trufflesecurity/trufflehog/releases/download/v3.83.7
 set BINARY_NAME=trufflehog
 set INSTALL_DIR=%~dp0bin
-set FILE=
+set FILE=trufflehog_3.83.7_windows_%ARCH%.tar.gz
 
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 
-:: Check Windows architecture for compatibility
-if /i "%ARCH%"=="amd64" (
-    set FILE=trufflehog_3.83.7_windows_amd64.zip
-) else (
-    echo Unsupported architecture for Windows: %ARCH%
-    exit /b 1
-)
-
+:: Download the binary
 echo Downloading %FILE% from %BASE_URL%
 curl -LO "%BASE_URL%/%FILE%"
 if %errorlevel% neq 0 (
@@ -51,15 +38,26 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+:: Extract the TAR.GZ file
 echo Extracting %FILE%
-tar -xzf %FILE%
-move "%BINARY_NAME%.exe" "%INSTALL_DIR%"
+powershell -Command "tar -xvf '%FILE%' -C '%INSTALL_DIR%'"
+if %errorlevel% neq 0 (
+    echo Failed to extract %FILE%.
+    exit /b 1
+)
 
-echo Cleaning up...
+:: Clean up
 del %FILE%
 
-:: Ensure the binary is executable
+:: Ensure the binary directory is in the PATH
 set PATH=%PATH%;%INSTALL_DIR%
+
+:: Test if TruffleHog is accessible
+%INSTALL_DIR%\%BINARY_NAME%.exe --version
+if %errorlevel% neq 0 (
+    echo Failed to verify TruffleHog installation.
+    exit /b 1
+)
 
 :: Setup Python virtual environment
 if not exist venv (
@@ -85,7 +83,7 @@ echo     hooks:
 echo       - id: trufflehog
 echo         name: TruffleHog
 echo         description: Detect secrets in your data.
-echo         entry: trufflehog git file://. --since-commit HEAD --fail
+echo         entry: "%INSTALL_DIR%\%BINARY_NAME%.exe git file://. --since-commit HEAD --fail"
 echo         language: system
 echo         stages: [^"pre-commit^", ^"pre-push^"]
 ) > .pre-commit-config.yaml
