@@ -46,11 +46,28 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: Clean up
+:: Clean up downloaded archive
 del %FILE%
 
 :: Ensure the binary directory is in the PATH
-set PATH=%PATH%;%INSTALL_DIR%
+for /f "tokens=*" %%A in ('powershell -Command "[System.Environment]::GetEnvironmentVariable('Path', 'User')"') do set "USER_PATH=%%A"
+
+echo Adding %INSTALL_DIR% to PATH...
+echo Current USER PATH: !USER_PATH!
+
+if "!USER_PATH!" == "" (
+    echo "Path variable could not be fetched properly. Please verify the script's execution."
+    exit /b 1
+)
+
+echo !USER_PATH! | findstr /i /c:"%INSTALL_DIR%" >nul
+if %errorlevel% neq 0 (
+    powershell -Command "[System.Environment]::SetEnvironmentVariable('Path', '!USER_PATH!;%INSTALL_DIR%', 'User')"
+    echo %INSTALL_DIR% has been added to PATH. Please restart your terminal for changes to take effect.
+) else (
+    echo %INSTALL_DIR% is already in PATH.
+)
+
 
 :: Test if TruffleHog is accessible
 %INSTALL_DIR%\%BINARY_NAME%.exe --version
